@@ -1,26 +1,24 @@
 'use strict'
 
-const Env = use('Env')
 const empty = require('is-empty')
 const Hash = use('Hash')
 const Usuario = use('App/Models/Usuario')
-const Mail = use('Mail')
+const Kue = use('Kue')
+const EnviaEmail = use('App/Jobs/EnviaEmail')
 
 class UsuarioController {
   async store ({ request }) {
     const data = request.only(['email', 'senha', 'nome'])
     const usuario = await Usuario.create(data)
-
-    await Mail.send(['emails.novo_usuario'], usuario.toJSON(), message => {
-      message
-        .to(usuario.email)
-        .from(
-          Env.get('MAIL_NAO_RESPONDER'),
-          Env.get('MAIL_NAO_RESPONDER_APRESENTACAO')
-        )
-        .subject(`Bem-vindo(a) ao Manejo`)
-    })
-
+    Kue.dispatch(
+      EnviaEmail.key,
+      {
+        data: usuario,
+        layout: 'novo_usuario',
+        assunto: 'Bem-vindo(a) ao Manejo'
+      },
+      { attempts: 3 }
+    )
     return usuario
   }
 
@@ -42,18 +40,14 @@ class UsuarioController {
       await usuario.save()
 
       if (!empty(data.senha)) {
-        await Mail.send(
-          ['emails.senha_alterada'],
-          usuario.toJSON(),
-          message => {
-            message
-              .to(usuario.email)
-              .from(
-                Env.get('MAIL_NAO_RESPONDER'),
-                Env.get('MAIL_NAO_RESPONDER_APRESENTACAO')
-              )
-              .subject(`Aviso modificação de senha - Manejo`)
-          }
+        Kue.dispatch(
+          EnviaEmail.key,
+          {
+            data: usuario,
+            layout: 'senha_alterada',
+            assunto: 'Aviso modificação de senha - Manejo'
+          },
+          { attempts: 3 }
         )
       }
       return usuario

@@ -1,9 +1,9 @@
 'use strict'
 
-const Env = use('Env')
 const generator = require('generate-password')
 const Usuario = use('App/Models/Usuario')
-const Mail = use('Mail')
+const Kue = use('Kue')
+const EnviaEmail = use('App/Jobs/EnviaEmail')
 
 class EsqueceuSenhaController {
   async store ({ request, response }) {
@@ -20,22 +20,18 @@ class EsqueceuSenhaController {
       usuario.senha = nova_senha
       await usuario.save()
 
-      await Mail.send(
-        ['emails.esqueceu_senha'],
+      Kue.dispatch(
+        EnviaEmail.key,
         {
-          email: usuario.email,
-          nova_senha,
-          link: ``
+          data: {
+            email: usuario.email,
+            nova_senha,
+            link: ``
+          },
+          layout: 'esqueceu_senha',
+          assunto: 'Recuperação de senha - Manejo'
         },
-        message => {
-          message
-            .to(usuario.email)
-            .from(
-              Env.get('MAIL_NAO_RESPONDER'),
-              Env.get('MAIL_NAO_RESPONDER_APRESENTACAO')
-            )
-            .subject('Recuperação de senha - Manejo')
-        }
+        { attempts: 3 }
       )
     } catch (e) {
       return response.status(e.status).send({
