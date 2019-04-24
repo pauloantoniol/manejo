@@ -13,6 +13,10 @@ class Usuario extends Model {
       }
     })
   }
+
+  Transacoes () {
+    return this.hasMany('App/Models/Transacoes')
+  }
 }
 
 module.exports = Usuario
